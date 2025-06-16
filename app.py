@@ -11,7 +11,7 @@ from ultralytics import YOLO
 DB_API_ENDPOINT = "https://localhost:7123/api/garbage"
 
 # --- NEW: Load your local YOLOv8 model once ---
-MODEL_PATH = "runs/detect/train5/weights/best.pt"
+MODEL_PATH = "runs/detect/train/weights/best.pt"
 model = YOLO(MODEL_PATH)
 
 # --- NEW: Class names (update if needed) ---
@@ -22,7 +22,26 @@ class_names = [
     'straw', 'toilet_cleaner'
 ]
 
-# Make Image
+categories = {
+    'plastic': [],
+    'cardboard': [],
+    'chemical': [],
+    'can': [],
+    'other': []
+}
+
+for item in class_names:
+    if 'plastic' in item:
+        categories['plastic'].append(item)
+    elif 'can' in item:
+        categories['can'].append(item)
+    elif 'cardboard' in item:
+        categories['cardboard'].append(item)
+    elif 'chemical' in item:
+        categories['chemical'].append(item)
+    else:
+        categories['other'].append(item)
+
 def capture_image():
     pipeline = dai.Pipeline()
     cam_rgb = pipeline.create(dai.node.ColorCamera)
@@ -38,7 +57,7 @@ def capture_image():
     with dai.Device(pipeline) as device:
         print("Calibrating exposure/white balance...")
         q = device.getOutputQueue(name="image", maxSize=1, blocking=True)
-        for _ in range(15):
+        for _ in range(5):
             q.get()
         print("Calibration done.")
         frame = q.get().getCvFrame()
@@ -46,9 +65,8 @@ def capture_image():
         cv2.imwrite(filename, frame)
         return filename
 
-# --- NEW: Local inference function using YOLOv8 ---
 def run_local_inference(image_path):
-    results = model.predict(image_path, conf=0.25, iou=0.45)
+    results = model.predict(image_path)
     predictions = []
     result = results[0]
     for box in result.boxes:
@@ -59,7 +77,14 @@ def run_local_inference(image_path):
             "class": class_name,
             "confidence": conf
         })
+    result.show()
     return {"predictions": predictions}
+
+def get_category(class_name):
+    for category, items in categories.items():
+        if class_name in items:
+            return category
+    return "other"
 
 def send_to_api(detected, confidence_score):
     sendData = {
@@ -87,9 +112,10 @@ while True:
         sent_any = False
         for pred in predictions:
             if pred.get("confidence", 0) > 0.70:
-                send_to_api(pred.get("class", "Unknown"), pred.get("confidence", 0))
+                category = get_category(pred.get("class", "Unknown"))
+                send_to_api(category, pred.get("confidence", 0))
                 sent_any = True
-                print(f"Sent prediction: {pred.get('class', 'Unknown')} with confidence {pred.get('confidence', 0)}")
+                print(f"Sent prediction: {category} with confidence {pred.get('confidence', 0)}")
         if not sent_any:
             print("No predictions above confidence threshold.")
 
