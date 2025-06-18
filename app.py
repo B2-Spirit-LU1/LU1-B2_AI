@@ -1,3 +1,4 @@
+import os
 import time
 import requests
 import cv2
@@ -41,6 +42,18 @@ for item in class_names:
         categories['chemical'].append(item)
     else:
         categories['other'].append(item)
+
+def deleteImageOlderThanDays(days):
+    now = datetime.now()
+    cutoff = now.timestamp() - (days * 24 * 60 * 60)
+    for filename in os.listdir():
+        if filename.startswith('image_') and filename.endswith('.jpg'):
+            file_time = os.path.getmtime(filename)
+            if file_time < cutoff:
+                os.remove(filename)
+                print(f"Deleted old image: {filename}")
+    print(f"Finished deleting images older than {days} days.")
+
 
 def capture_image():
     pipeline = dai.Pipeline()
@@ -97,6 +110,8 @@ def send_to_api(detected, confidence_score):
     response = requests.post(DB_API_ENDPOINT, json=sendData, verify=False)
     print(f"Sent to API,  Status: {response.status_code}")
     return response.status_code
+
+deleteImageOlderThanDays(28)
 
 # loop every hour
 while True:
