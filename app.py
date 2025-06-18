@@ -111,11 +111,11 @@ def send_to_api(detected, confidence_score):
     print(f"Sent to API,  Status: {response.status_code}")
     return response.status_code
 
-deleteImageOlderThanDays(28)
 
 # loop every hour
 while True:
     try:
+        deleteImageOlderThanDays(28)
         print("Capturing image...")
         image = capture_image()
 
